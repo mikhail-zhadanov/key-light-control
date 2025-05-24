@@ -67,10 +67,47 @@ fn handle_to_hwnd(handle: Win32WindowHandle) -> HWND {
     HWND(handle.hwnd.get() as *mut std::ffi::c_void)
 }
 
-struct MyApp {
+// Helper functions to load and save settings in the registry.
+fn load_app_settings() -> MyAppSettings {
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let key_path = "Software\\KeyLightControl";
+    if let Ok(key) = hkcu.open_subkey_with_flags(key_path, KEY_READ) {
+        let ip: String = key
+            .get_value("IP")
+            .unwrap_or_else(|_| "192.168.178.21".to_owned());
+        let port: u16 = key.get_value::<u32, _>("Port").unwrap_or(9123) as u16;
+        let interval: u32 = key.get_value("Interval").unwrap_or(500);
+        MyAppSettings {
+            ip_address: ip,
+            port: port,
+            check_interval: interval,
+        }
+    } else {
+        MyAppSettings {
+            ip_address: "192.168.178.21".to_owned(),
+            port: 9123,
+            check_interval: 500,
+        }
+    }
+}
+
+fn save_app_settings(settings: MyAppSettings) -> Result<(), Box<dyn std::error::Error>> {
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let (key, _) = hkcu.create_subkey("Software\\KeyLightControl")?;
+    key.set_value("IP", &settings.ip_address)?;
+    key.set_value("Port", &(settings.port as u32))?;
+    key.set_value("Interval", &settings.check_interval)?;
+    Ok(())
+}
+
+struct MyAppSettings {
     ip_address: String,
     port: u16,
     check_interval: u32,
+}
+
+struct MyApp {
+    settings: MyAppSettings,
     cmd_tx: Sender<background::BackgroundCommand>,
     log_rx: Receiver<String>,
     last_log: Option<String>,
@@ -81,27 +118,29 @@ struct MyApp {
 
 impl Default for MyApp {
     fn default() -> Self {
-        let ip = "192.168.178.21".to_owned();
-        let port = 9123;
-        let interval = 500;
+        // Load settings from registry.
+        let settings: MyAppSettings = load_app_settings();
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
         let (log_tx, log_rx) = std::sync::mpsc::channel();
-        let handle = spawn_worker(ip.clone(), port, interval, cmd_rx, log_tx);
+        let handle = spawn_worker(
+            settings.ip_address.clone(),
+            settings.port,
+            settings.check_interval,
+            cmd_rx,
+            log_tx,
+        );
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let run = hkcu.open_subkey_with_flags(
             "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-            KEY_READ,
+            winreg::enums::KEY_READ,
         );
-        let auto = match run.and_then(|key| key.get_value::<String, _>("KeyLightControl")) {
-            Ok(_) => true,
-            Err(_) => false,
-        };
+        let auto = run
+            .and_then(|key| key.get_value::<String, _>("KeyLightControl"))
+            .is_ok();
 
         Self {
-            ip_address: ip,
-            port,
-            check_interval: interval,
+            settings: settings,
             cmd_tx,
             log_rx,
             last_log: None,
@@ -126,35 +165,37 @@ impl eframe::App for MyApp {
             let mut restart = false;
             ui.horizontal(|ui| {
                 ui.label("IP address: ");
-                if ui.text_edit_singleline(&mut self.ip_address).changed() {
-                    self.ip_address = self.ip_address.trim().to_string();
+                if ui
+                    .text_edit_singleline(&mut self.settings.ip_address)
+                    .changed()
+                {
+                    self.settings.ip_address = self.settings.ip_address.trim().to_string();
                     restart = true;
                 }
             });
             ui.horizontal(|ui| {
                 ui.label("Port: ");
-                let mut s = self.port.to_string();
+                let mut s = self.settings.port.to_string();
                 if ui.text_edit_singleline(&mut s).changed() {
                     if let Ok(p) = s.parse() {
-                        self.port = p;
+                        self.settings.port = p;
                         restart = true;
                     }
                 }
             });
             ui.horizontal(|ui| {
                 ui.label("Interval (ms): ");
-                let mut s = self.check_interval.to_string();
+                let mut s = self.settings.check_interval.to_string();
                 if ui.text_edit_singleline(&mut s).changed() {
                     if let Ok(i) = s.parse() {
-                        self.check_interval = i;
+                        self.settings.check_interval = i;
                         restart = true;
                     }
                 }
             });
 
             ui.separator();
-
-            // Auto-run checkbox
+            // Auto-run checkbox (unchanged)
             if ui
                 .checkbox(&mut self.auto_start, "Start with Windows")
                 .changed()
@@ -162,10 +203,14 @@ impl eframe::App for MyApp {
                 set_autostart(self.auto_start)
                     .unwrap_or_else(|e| eprintln!("Registry error: {:?}", e));
             }
-
             ui.separator();
             ui.label(self.last_log.as_deref().unwrap_or(""));
             if restart {
+                let _ = save_app_settings(MyAppSettings {
+                    ip_address: self.settings.ip_address.clone(),
+                    port: self.settings.port,
+                    check_interval: self.settings.check_interval,
+                });
                 let _ = self.cmd_tx.send(background::BackgroundCommand::Stop);
                 if let Some(h) = self.worker_handle.take() {
                     let _ = h.join();
@@ -173,9 +218,9 @@ impl eframe::App for MyApp {
                 self.last_log = None;
                 let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
                 let (log_tx, log_rx) = std::sync::mpsc::channel();
-                let ip = self.ip_address.clone();
-                let port = self.port;
-                let interval = self.check_interval;
+                let ip = self.settings.ip_address.clone();
+                let port = self.settings.port;
+                let interval = self.settings.check_interval;
                 let handle = spawn_worker(ip, port, interval, cmd_rx, log_tx);
                 self.worker_handle = Some(handle);
                 self.cmd_tx = cmd_tx;
