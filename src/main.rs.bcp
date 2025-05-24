@@ -1,0 +1,62 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod utils;
+use log::{error, info};
+use std::net::IpAddr;
+use std::str::FromStr;
+use std::{thread::sleep, time::Duration};
+
+fn main() {
+    env_logger::init();
+
+    let camera_check_interval = Duration::from_millis(500);
+    let light_ip: &str = "192.168.178.21";
+    let light_port: u16 = 9123;
+    let mut is_light_on: bool;
+
+    if IpAddr::from_str(light_ip).is_err() {
+        error!("Invalid IP address");
+        return;
+    }
+
+    if let Err(e) = utils::light::change(false, light_ip, light_port) {
+        error!("Failed to change light state: {}", e);
+        return;
+    }
+    is_light_on = false;
+
+    loop {
+        match utils::camera::is_enabled() {
+            Ok(is_camera_enabled) => {
+                if is_camera_enabled && !is_light_on {
+                    if let Err(e) = utils::light::change(true, light_ip, light_port) {
+                        error!("Failed to turn on the light: {}", e);
+                    } else {
+                        info!("Camera access is enabled");
+                        is_light_on = true;
+                    }
+                } else if !is_camera_enabled && is_light_on {
+                    if let Err(e) = utils::light::change(false, light_ip, light_port) {
+                        error!("Failed to turn off the light: {}", e);
+                    } else {
+                        info!("Camera access is disabled");
+                        is_light_on = false;
+                    }
+                } else {
+                    info!(
+                        "Camera access is {}",
+                        if is_camera_enabled {
+                            "enabled"
+                        } else {
+                            "disabled"
+                        }
+                    );
+                }
+            }
+            Err(e) => {
+                error!("Failed to check camera access: {}", e);
+            }
+        }
+        sleep(camera_check_interval);
+    }
+}
