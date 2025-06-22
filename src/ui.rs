@@ -2,6 +2,7 @@
 
 use crate::background::{self, BackgroundCommand};
 use crate::settings::*;
+use crate::utils::light;
 use eframe::egui;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread::JoinHandle;
@@ -21,18 +22,30 @@ impl Default for MyApp {
         let settings: MyAppSettings = load_app_settings();
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
         let (log_tx, log_rx) = std::sync::mpsc::channel();
+        let (light_on, brightness, temperature) = light::get_state(
+            &settings.ip_address,
+            settings.port,
+        )
+        .unwrap_or((settings.light_on, settings.brightness, settings.temperature));
         let handle = spawn_worker(
             settings.ip_address.clone(),
             settings.port,
             settings.check_interval,
             cmd_rx,
             log_tx,
+            brightness,
+            temperature,
         );
 
         let auto = is_autostart_enabled();
 
         Self {
-            settings,
+            settings: MyAppSettings {
+                light_on,
+                brightness,
+                temperature,
+                ..settings
+            },
             cmd_tx,
             log_rx,
             last_log: None,
@@ -58,7 +71,10 @@ impl eframe::App for MyApp {
             let mut restart = false;
             ui.horizontal(|ui| {
                 ui.label("IP address: ");
-                if ui.text_edit_singleline(&mut self.settings.ip_address).changed() {
+                if ui
+                    .text_edit_singleline(&mut self.settings.ip_address)
+                    .changed()
+                {
                     self.settings.ip_address = self.settings.ip_address.trim().to_string();
                     restart = true;
                 }
@@ -85,12 +101,73 @@ impl eframe::App for MyApp {
             });
 
             ui.separator();
-            if ui.checkbox(&mut self.auto_start, "Start with Windows").changed() {
+            if ui
+                .checkbox(&mut self.auto_start, "Start with Windows")
+                .changed()
+            {
                 set_autostart(self.auto_start)
                     .unwrap_or_else(|e| eprintln!("Registry error: {:?}", e));
             }
 
             ui.separator();
+            if ui.button("Toggle Light On/Off").clicked() {
+                if let Err(e) = self.cmd_tx.send(BackgroundCommand::Stop) {
+                    eprintln!("Failed to send command: {}", e);
+                }
+                if let Err(e) = light::set_state(
+                    !self.settings.light_on,
+                    &self.settings.ip_address,
+                    self.settings.port,
+                    self.settings.brightness,
+                    self.settings.temperature,
+                ) {
+                    eprintln!("Failed to toggle light: {}", e);
+                } else {
+                    // update light_on state if successful
+                    self.settings.light_on = !self.settings.light_on;
+                }
+            }
+
+            if ui
+                .add(
+                    egui::Slider::new(&mut self.settings.brightness, 0..=100)
+                        .text("Brightness")
+                        .step_by(1.0),
+                )
+                .changed()
+            {
+                if let Err(e) = light::set_state(
+                    self.settings.light_on,
+                    &self.settings.ip_address,
+                    self.settings.port,
+                    self.settings.brightness,
+                    self.settings.temperature,
+                ) {
+                    eprintln!("Failed to update brightness: {}", e);
+                }
+            }
+
+            if ui
+                .add(
+                    egui::Slider::new(&mut self.settings.temperature, 2900..=7000)
+                        .text("Temperature Kelvin")
+                        .step_by(50.0),
+                )
+                .changed()
+            {
+                if let Err(e) = light::set_state(
+                    self.settings.light_on,
+                    &self.settings.ip_address,
+                    self.settings.port,
+                    self.settings.brightness,
+                    self.settings.temperature,
+                ) {
+                    eprintln!("Failed to update temperature: {}", e);
+                }
+            }
+
+            ui.separator();
+
             ui.label(self.last_log.as_deref().unwrap_or(""));
 
             if restart {
@@ -98,6 +175,9 @@ impl eframe::App for MyApp {
                     ip_address: self.settings.ip_address.clone(),
                     port: self.settings.port,
                     check_interval: self.settings.check_interval,
+                    brightness: self.settings.brightness,
+                    temperature: self.settings.temperature,
+                    light_on: self.settings.light_on,
                 });
 
                 let _ = self.cmd_tx.send(BackgroundCommand::Stop);
@@ -112,7 +192,17 @@ impl eframe::App for MyApp {
                 let ip = self.settings.ip_address.clone();
                 let port = self.settings.port;
                 let interval = self.settings.check_interval;
-                let handle = spawn_worker(ip, port, interval, cmd_rx, log_tx);
+                let (light_on, brightness, temperature) =
+                    light::get_state(&self.settings.ip_address, self.settings.port).unwrap_or((
+                        self.settings.light_on,
+                        self.settings.brightness,
+                        self.settings.temperature,
+                    ));
+                self.settings.light_on = light_on;
+                self.settings.brightness = brightness;
+                self.settings.temperature = temperature;
+                let handle =
+                    spawn_worker(ip, port, interval, cmd_rx, log_tx, brightness, temperature);
 
                 self.worker_handle = Some(handle);
                 self.cmd_tx = cmd_tx;
@@ -128,6 +218,10 @@ fn spawn_worker(
     interval: u32,
     cmd_rx: Receiver<BackgroundCommand>,
     log_tx: Sender<String>,
+    brightness: u8,
+    temperature: u16,
 ) -> JoinHandle<()> {
-    std::thread::spawn(move || background::run(ip, port, cmd_rx, log_tx, interval))
+    std::thread::spawn(move || {
+        background::run(ip, port, cmd_rx, log_tx, interval, brightness, temperature)
+    })
 }

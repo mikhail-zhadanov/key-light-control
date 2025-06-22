@@ -1,5 +1,6 @@
 // Helper functions to load and save settings in the registry.
 use crate::consts::*;
+use crate::utils::light;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 use winreg::RegKey;
 
@@ -9,6 +10,9 @@ pub struct MyAppSettings {
     pub ip_address: String,
     pub port: u16,
     pub check_interval: u32,
+    pub brightness: u8,
+    pub temperature: u16,
+    pub light_on: bool,
 }
 
 impl Default for MyAppSettings {
@@ -17,6 +21,9 @@ impl Default for MyAppSettings {
             ip_address: "192.168.178.21".to_owned(),
             port: 9123,
             check_interval: 500,
+            brightness: 100,
+            temperature: 5000,
+            light_on: false,
         }
     }
 }
@@ -38,10 +45,15 @@ pub fn load_app_settings() -> MyAppSettings {
             .get_value::<u32, _>("Port")
             .unwrap_or(default.port as u32) as u16;
         let interval: u32 = key.get_value("Interval").unwrap_or(default.check_interval);
+        let (light_on, brightness, temperature) =
+            light::get_state(&ip, port).unwrap_or((false, default.brightness, default.temperature));
         MyAppSettings {
             ip_address: ip,
             port,
             check_interval: interval,
+            brightness: brightness,
+            temperature: temperature,
+            light_on: light_on,
         }
     } else {
         MyAppSettings::default()
