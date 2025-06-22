@@ -25,7 +25,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: key-light-control
-          path: target/release/gui-app.exe
+          path: target/release/key-light-control.exe
 
   release:
     needs: build
@@ -42,6 +42,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: key-light-control/gui-app.exe
+          files: key-light-control/key-light-control.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
