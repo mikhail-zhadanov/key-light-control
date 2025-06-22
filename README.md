@@ -1,16 +1,17 @@
 # Key Light Control
 
-A Windows GUI application to control Elgato Key Lights via their local HTTP API.
+A Windows GUI application to control Elgato Key Lights via their local HTTP API, with **automatic camera detection** to turn lights on/off based on camera usage - a feature missing in the official app.
 Built with [egui](https://github.com/emilk/egui), [eframe](https://github.com/emilk/egui/tree/master/crates/eframe), and [reqwest](https://github.com/seanmonstar/reqwest).
 
-## Features
+## Key Features
 
+- **Automatic camera-based control**: Unlike the original Elgato application, this app automatically turns on lights when your camera is in use and turns them off when not - perfect for video calls and streaming!
 - System tray icon for quick access and hiding the main window
-- Toggle light on/off
+- Toggle light on/off manually when needed
 - Adjust brightness (0–100)
 - Adjust color temperature (2900K–7000K, 50K steps)
 - Auto-start with Windows option
-- Periodic background polling and control
+- Periodic background polling and camera detection
 - Settings saved in Windows registry
 
 ## Usage
@@ -18,13 +19,23 @@ Built with [egui](https://github.com/emilk/egui), [eframe](https://github.com/em
 1. **Configure IP and Port**  
    Enter your Elgato Key Light's IP address and port in the GUI.
 2. **Control the Light**  
-   - Use the toggle button to turn the light on or off.
+   - The light will automatically turn on when your camera is detected as active.
+   - Use the toggle button to manually turn the light on or off when needed.
    - Adjust brightness and temperature with sliders.
    - All changes are sent instantly to the device.
 3. **Auto-Start**  
    Enable "Start with Windows" to launch the app automatically.
 4. **Tray Icon**  
    Minimize to tray and restore the window by clicking the tray icon.
+
+## Download and Installation
+
+1. **Download**  
+   [Download the latest release](https://github.com/mikhail-zhadanov/key-light-control/releases/latest/download/key-light-control.zip)
+2. **Installation**  
+   - Simply unpack the ZIP file to any folder of your choice.
+   - No formal installation required - just run the executable.
+   - For easy access, you can create a shortcut on your desktop or pin it to the taskbar.
 
 ## Building
 
