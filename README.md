@@ -35,7 +35,6 @@ Built with [egui](https://github.com/emilk/egui), [eframe](https://github.com/em
 2. **Installation**  
    - Simply unpack the ZIP file to any folder of your choice.
    - No formal installation required - just run the executable.
-   - For easy access, you can create a shortcut on your desktop or pin it to the taskbar.
 
 ## Building
 
