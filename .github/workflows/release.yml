@@ -13,12 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust (MSVC)
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.71.0
-          override: true
-
       - name: Add MSVC target
         run: rustup target add x86_64-pc-windows-msvc
 
