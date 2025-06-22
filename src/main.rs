@@ -21,7 +21,7 @@ use ui::MyApp;
 static VISIBLE: Mutex<bool> = Mutex::new(false);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let icon_image: IconImage = load_icon_raw(std::path::Path::new(TRAY_ICON_LIT_PATH))?;
+    let icon_image: IconImage = load_icon_from_memory(TRAY_ICON_LIT_BYTES)?;
     let _tray_icon = TrayIconBuilder::new()
         .with_icon(icon_image.to_tray_icon())
         .with_tooltip(APPNAME)

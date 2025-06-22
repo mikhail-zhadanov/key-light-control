@@ -26,7 +26,7 @@ pub fn run(ip: String, port: u16, cmd_rx: Receiver<BackgroundCommand>, log_tx: S
     loop {
         // Check for Stop command
         if let Ok(BackgroundCommand::Stop) = cmd_rx.try_recv() {
-            let _ = log_tx.send("Stopped".into());
+            let _ = log_tx.send("Stopped camera control".into());
             break;
         }
         match crate::utils::camera::is_enabled() {

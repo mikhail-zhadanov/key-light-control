@@ -1,6 +1,5 @@
 use eframe::egui::IconData;
 use tray_icon::Icon;
-use std::path::Path;
 
 /// Represents an image used for tray and egui icons.
 pub struct IconImage {
@@ -27,13 +26,8 @@ impl IconImage {
     }
 }
 
-/// Loads an icon image from the specified path.
-///
-/// # Errors
-///
-/// Returns an error if the image cannot be opened or processed.
-pub fn load_icon_raw(path: &Path) -> Result<IconImage, image::ImageError> {
-    let image = image::open(path)?.into_rgba8();
+pub fn load_icon_from_memory(data: &[u8]) -> Result<IconImage, image::ImageError> {
+    let image = image::load_from_memory(data)?.into_rgba8();
     let (width, height) = image.dimensions();
     let rgba = image.into_raw();
     Ok(IconImage { rgba, width, height })

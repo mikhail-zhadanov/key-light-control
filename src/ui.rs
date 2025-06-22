@@ -111,8 +111,12 @@ impl eframe::App for MyApp {
 
             ui.separator();
             if ui.button("Toggle Light On/Off").clicked() {
-                if let Err(e) = self.cmd_tx.send(BackgroundCommand::Stop) {
-                    eprintln!("Failed to send command: {}", e);
+                if !self.settings.light_on {
+                    if let Err(e) = self.cmd_tx.send(BackgroundCommand::Stop) {
+                        eprintln!("Failed to send command: {}", e);
+                    }
+                } else {
+                    restart = true;
                 }
                 if let Err(e) = light::set_state(
                     !self.settings.light_on,
