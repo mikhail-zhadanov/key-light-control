@@ -17,10 +17,14 @@ mod utils;
 use crate::utils::icon::*;
 mod ui;
 use ui::MyApp;
+use std::fs::File;
+use std::io::Write;
+
 
 static VISIBLE: Mutex<bool> = Mutex::new(false);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    set_panic_hook();
     let icon_image: IconImage = load_icon_from_memory(TRAY_ICON_LIT_BYTES)?;
     let _tray_icon = TrayIconBuilder::new()
         .with_icon(icon_image.to_tray_icon())
@@ -73,6 +77,15 @@ fn setup_tray_icon_click_handler(handle: Win32WindowHandle) {
                 }
             }
             *visible = !*visible;
+        }
+    }));
+}
+
+fn set_panic_hook() {
+    std::panic::set_hook(Box::new(|panic_info| {
+        let crash_file = "crash.log";
+        if let Ok(mut file) = File::create(crash_file) {
+            let _ = writeln!(file, "Panic occurred: {:?}", panic_info);
         }
     }));
 }
