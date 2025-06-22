@@ -44,6 +44,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: key-light-control/key-light-control.exe
+          files: key-light-control.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
