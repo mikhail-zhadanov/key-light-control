@@ -6,7 +6,7 @@ use eframe::egui;
 use std::sync::Mutex;
 use tray_icon::{MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use windows::Win32::Foundation::HWND;
-use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOWDEFAULT};
+use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOWDEFAULT, SetForegroundWindow};
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle, Win32WindowHandle};
 
 mod background;
@@ -68,6 +68,9 @@ fn setup_tray_icon_click_handler(handle: Win32WindowHandle) {
             let hwnd = handle_to_hwnd(handle);
             unsafe {
                 let _ = ShowWindow(hwnd, if *visible { SW_HIDE } else { SW_SHOWDEFAULT });
+                if !*visible {
+                    let _ = SetForegroundWindow(hwnd);
+                }
             }
             *visible = !*visible;
         }
